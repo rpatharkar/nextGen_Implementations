@@ -1,7 +1,52 @@
 #!/usr/bin/env bash
+# Compatibility entrypoint for this folder. The exporter lives next to this script.
+# Default format is csv so old calls keep working. Pass --format parquet|both to change.
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-if [[ -x "$ROOT/.venv/bin/python" ]]; then
-  exec "$ROOT/.venv/bin/python" "$ROOT/restore_bak_to_csv.py" "$@"
+UNIFIED="${ROOT}/mssql_bak_to_parquet.sh"
+[[ -x "${UNIFIED}" ]] || { echo "Missing ${UNIFIED}" >&2; exit 1; }
+
+FORMAT_SET=0
+FORWARD=()
+BAK=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --format) FORMAT_SET=1; FORWARD+=(--format "${2:-}"); shift 2 ;;
+    --keep-container) FORWARD+=(--keep-sqlserver); shift ;;
+    --keep-db)
+      echo "Note: --keep-db is ignored. Use --keep-sqlserver to keep the restored database." >&2
+      shift
+      ;;
+    --bak) BAK="${2:-}"; shift 2 ;;
+    --out|--sa-password|--container-name|--network-name|--mssql-image|--host-port|--schemas|--tables|--chunksize)
+      FORWARD+=("$1" "${2:-}"); shift 2 ;;
+    --keep-sqlserver|--skip-restore|--skip-export|--skip-docs|--force|--fail-fast|--rebuild-exporter)
+      FORWARD+=("$1"); shift ;;
+    -h|--help)
+      exec "${UNIFIED}" --help
+      ;;
+    -*)
+      echo "Unknown argument: $1" >&2
+      exit 1
+      ;;
+    *)
+      if [[ -z "${BAK}" ]]; then
+        BAK="$1"
+        shift
+      else
+        echo "Unexpected extra argument: $1" >&2
+        exit 1
+      fi
+      ;;
+  esac
+done
+
+[[ -n "${BAK}" ]] || { echo "Backup path is required." >&2; "${UNIFIED}" --help; exit 1; }
+
+if [[ "${FORMAT_SET}" -eq 0 ]]; then
+  FORWARD+=(--format csv)
 fi
-exec python3 "$ROOT/restore_bak_to_csv.py" "$@"
+
+exec "${UNIFIED}" --bak "${BAK}" "${FORWARD[@]}"
