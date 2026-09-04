@@ -64,6 +64,16 @@ This tool:
 
 SQL Server and exporter **images** stay (re-pull is slow). To keep the restored DB: `--keep-sqlserver`.
 
+## Next scope (working on this now)
+
+Export already writes a machine catalog (`schema_catalog.json`) plus Mermaid ER. The next work on this tool is:
+
+1. **Draw.io ER** — generate `er_diagram.drawio` from `schema_catalog.json` (not from scanning every parquet file). One page per FK cluster. Declared FKs as solid edges. If the ISV dump has no FKs, optional name-inferred joins as dashed edges, never mixed in as if they were constraints.
+2. **Data profiling** — from the extracted tables + catalog: row counts vs manifest, empty vs populated, PK nulls, duplicate keys, FK orphans (or inferred-key orphans), basic column stats for populated hubs. Output a `data_profile.md` (and/or CSV) next to the parquet/csv files.
+3. **Re-run after Docker is gone** — both Draw.io and the profiler must work from export output alone so a second restore is not required.
+
+Out of scope for this pass: row-level knowledge graphs, profiling every unused Civic module, or treating inferred joins as ground truth.
+
 ## Files in this folder
 
 | File | Role |
